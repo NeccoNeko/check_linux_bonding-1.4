@@ -255,6 +255,7 @@ sub find_bonding_sysfs {
     my $masters_file = "$sysdir/bonding_masters";
     my @bonds        = ();
     my %bonding      = ();
+    my $buf;
 
     if (! -f $masters_file) {
 	return {};
@@ -288,36 +289,40 @@ sub find_bonding_sysfs {
 	my @slaves = ();
 	open my $SLAVES, '<', "$sysdir/$bond/bonding/slaves"
 	  or unknown_error("Couldn't open $sysdir/$bond/bonding/slaves: $!");
-	@slaves = split m/\s+/xms, <$SLAVES>;
+	$buf = <$SLAVES>;
 	close $SLAVES;
 
-	# get active slave
-	open my $ACTIVE, '<', "$sysdir/$bond/bonding/active_slave"
-	  or unknown_error("Couldn't open $sysdir/$bond/bonding/active_slave: $!");
-	$bonding{$bond}{active} = <$ACTIVE>;
-	close $ACTIVE;
-	if (defined $bonding{$bond}{active}) {
-	    chop $bonding{$bond}{active};
-	}
+	if ($buf) {
+	    @slaves = split m/\s+/xms, $buf;
 
-	# get primary slave
-	open my $PRIMARY, '<', "$sysdir/$bond/bonding/primary"
-	  or unknown_error("Couldn't open $sysdir/$bond/bonding/primary: $!");
-	$bonding{$bond}{primary} = <$PRIMARY>;
-	close $PRIMARY;
-	if (defined $bonding{$bond}{primary}) {
-	    chop $bonding{$bond}{primary};
-	}
+	    # get active slave
+	    open my $ACTIVE, '<', "$sysdir/$bond/bonding/active_slave"
+	      or unknown_error("Couldn't open $sysdir/$bond/bonding/active_slave: $!");
+	    $bonding{$bond}{active} = <$ACTIVE>;
+	    close $ACTIVE;
+	    if (defined $bonding{$bond}{active}) {
+	        chop $bonding{$bond}{active};
+	    }
 
-	# get slave status
-	foreach my $slave (@slaves) {
-	    my $statefile = -e "$sysdir/$bond/slave_$slave/operstate"
-	      ? "$sysdir/$bond/slave_$slave/operstate"
-		: "$sysdir/$bond/lower_$slave/operstate";
-	    open my $STATE, '<', "$statefile"
-	      or unknown_error("Couldn't open $statefile: $!");
-	    chop($bonding{$bond}{slave}{$slave} = <$STATE>);
-	    close $STATE;
+	    # get primary slave
+	    open my $PRIMARY, '<', "$sysdir/$bond/bonding/primary"
+	      or unknown_error("Couldn't open $sysdir/$bond/bonding/primary: $!");
+	    $bonding{$bond}{primary} = <$PRIMARY>;
+	    close $PRIMARY;
+	    if (defined $bonding{$bond}{primary}) {
+	        chop $bonding{$bond}{primary};
+	    }
+
+	    # get slave status
+	    foreach my $slave (@slaves) {
+	        my $statefile = -e "$sysdir/$bond/slave_$slave/operstate"
+	          ? "$sysdir/$bond/slave_$slave/operstate"
+		    : "$sysdir/$bond/lower_$slave/operstate";
+	        open my $STATE, '<', "$statefile"
+	          or unknown_error("Couldn't open $statefile: $!");
+	        chop($bonding{$bond}{slave}{$slave} = <$STATE>);
+	        close $STATE;
+	    }
 	}
 
 	# get bond state
